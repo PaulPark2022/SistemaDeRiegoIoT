@@ -1,4 +1,4 @@
-// Primera prueba de código
+// Primera prueba de código, originalmente planeada para un Arduino
 
 #define pin_led 2
 
