@@ -1,8 +1,7 @@
 from tkinter import BOTH, Tk, Frame, messagebox, Label
 from tkinter.ttk import Combobox, Button, Style, LabelFrame
 import threading
-import time
-
+import time  # Agrega el tiempo si es necesario para la simulación de la conexión
 from utils_riego import find_available_serial_ports
 from serial_sensor_riego import BAUDRATES
 from serial_sensor_riego import SerialSensor
@@ -12,6 +11,7 @@ class App(Frame):
         super().__init__(parent, *args, **kwargs)
         self.parent: Tk = parent
         self.serial_device: SerialSensor | None = None
+        self.lock = threading.Lock()  # Añadido un bloqueo para gestionar el acceso concurrente
 
         # Establecer el estilo
         style = Style()
@@ -27,7 +27,7 @@ class App(Frame):
         self.init_gui()
 
     def init_gui(self) -> None:
-        self.parent.title('SistemaRiego')
+        self.parent.title('ArduSerial')
         self.parent.geometry('600x400')
         self['bg'] = 'lightgrey'
         self.pack(expand=True, fill=BOTH)
@@ -40,36 +40,48 @@ class App(Frame):
         self.columnconfigure(0, weight=1)
 
     def refresh_serial_devices(self) -> None:
-        ports = find_available_serial_ports()
-        self.serial_devices_combobox['values'] = ports
-        
+        # Ejecutar la actualización de puertos en un hilo separado
+        threading.Thread(target=self._refresh_serial_devices).start()
+
+    def _refresh_serial_devices(self) -> None:
+        with self.lock:  # Asegurarse de que solo un hilo acceda a este bloque a la vez
+            ports = find_available_serial_ports()
+            self.serial_devices_combobox['values'] = ports
+
     def connect_serial_device(self) -> None:
         # Ejecutar la conexión en un hilo separado
         threading.Thread(target=self._connect_serial_device).start()
 
     def _connect_serial_device(self) -> None:
-        try:
-            baudrate = int(self.baudrate_combobox.get())
-            port = self.serial_devices_combobox.get()
-            if port == '':
-                messagebox.showerror('Port not selected', 'Please select a valid port.')
-                return
-            self.serial_device = SerialSensor(port=port, baudrate=baudrate)
-            time.sleep(2)  # Simulación del tiempo de conexión (eliminar si no es necesario)
-            messagebox.showinfo('Connection', 'Serial device connected successfully.')
-        except ValueError:
-            messagebox.showerror('Wrong baudrate', 'This baudrate is not valid.')
-            return
-        except Exception as e:
-            messagebox.showerror('Connection error', f"An error occurred: {e}")
+        with self.lock:  # Asegurarse de que solo un hilo acceda a este bloque a la vez
+            try:
+                baudrate = int(self.baudrate_combobox.get())
+                port = self.serial_devices_combobox.get()
+                if port == '':
+                    messagebox.showerror('Port not selected', 'Please select a valid port.')
+                    return
+                if self.serial_device:
+                    self.serial_device.close()  # Cerrar cualquier conexión anterior
+                self.serial_device = SerialSensor(port=port, baudrate=baudrate)
+                time.sleep(2)  # Simulación del tiempo de conexión (eliminar si no es necesario)
+                messagebox.showinfo('Connection', 'Serial device connected successfully.')
+            except ValueError:
+                messagebox.showerror('Wrong baudrate', 'This baudrate is not valid.')
+            except Exception as e:
+                if self.serial_device:
+                    self.serial_device.close()  # Asegurarse de que el puerto serie se cierre en caso de error
+                messagebox.showerror('Connection error', f"An error occurred: {e}")
 
     def read_humidity(self) -> None:
-        if self.serial_device is not None:
-            humidity = self.serial_device.send('HC2')
-            self.humidity_label['text'] = f"{humidity[1:-2]} %"  # Ajustar según el formato de salida del sensor
-            return
-        messagebox.showerror(title='Serial connection Error', message='Serial Device not initialized.')
-
+        with self.lock:  # Asegurarse de que solo un hilo acceda a este bloque a la vez
+            if self.serial_device is not None:
+                try:
+                    humidity = self.serial_device.send('HC2')
+                    self.humidity_label['text'] = f"{humidity[1:-2]} %"  # Ajustar según el formato de salida del sensor
+                except Exception as e:
+                    messagebox.showerror('Read error', f"An error occurred: {e}")
+            else:
+                messagebox.showerror(title='Serial connection Error', message='Serial Device not initialized.')
 
     def _create_serial_frame(self) -> LabelFrame:
         frame = LabelFrame(self, text='Serial Connection', padding=20)
@@ -93,11 +105,11 @@ class App(Frame):
         frame = LabelFrame(self, text='Humidity Reading', padding=20)
         self.humidity_label = Label(frame, text='XX %', foreground='blue', font=("Courier", 20))
         self.read_humidity_button = Button(frame, text='Read humidity', command=self.read_humidity)
-       
+
         # Organizar los widgets dentro del frame
         self.humidity_label.grid(row=0, column=0, padx=5, pady=5)
         self.read_humidity_button.grid(row=0, column=1, padx=5, pady=5)
-       
+
         return frame
 
 root = Tk()
