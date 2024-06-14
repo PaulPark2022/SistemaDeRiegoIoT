@@ -5,13 +5,6 @@
  * Author: diego
  */
 
-/*
- * SistemaRiego.c
- *
- * Created: 6/11/2024 9:35:29 AM
- * Author: pablo
- */
-
 #include <io.h>
 #include <mega328p.h>  
 #include <delay.h>
@@ -19,8 +12,8 @@
 
 //Valores de totalmente seco y totalmente humedo que da el sensor de humedad del suelo 
 
-#define VALOR_SECO 1023    // Valor del sensor cuando el suelo est· seco
-#define VALOR_HUMEDO 272   // Valor del sensor cuando el suelo est· completamente h˙medo
+#define VALOR_SECO 1023    // Valor del sensor cuando el suelo est√° seco
+#define VALOR_HUMEDO 272   // Valor del sensor cuando el suelo est√° completamente h√∫medo
 
 
 // ADC Voltage Reference: AVCC pin
@@ -61,7 +54,7 @@ void main(void)
     // Digital input buffers on ADC0: On, ADC1: On, ADC2: On, ADC3: On
     // ADC4: On, ADC5: Off
     DIDR0 = (1<<ADC5D) | (0<<ADC4D) | (0<<ADC3D) | (0<<ADC2D) | (0<<ADC1D) | (0<<ADC0D);   
-    // Desactiva bits con un 1 si quieres entradas analÛgicas y digitales 
+    // Desactiva bits con un 1 si quieres entradas anal√≥gicas y digitales 
     
     // USART initialization
     // Communication Parameters: 8 Data, 1 Stop, No Parity
@@ -95,19 +88,12 @@ void main(void)
         porEnt = porcentajeHumedad; // Parte entera  
         
         printf(" %i", porEnt);
-        delay_ms(1000); // Esperar 1 segundo
-        
-        if (porEnt < 10) 
-        {            
-            delay_ms(1000); 
+        delay_ms(1000); // Esperar 1 segundo  
+       
+        if (porEnt < 10) {
             PORTD.2 = 1;
-            delay_ms(1000);
+        } else {
             PORTD.2 = 0;
-        }
-        else 
-        {    
-            delay_ms(1000); 
-            PORTD.2 = 1;
-        }
+        }   
     }
 }
