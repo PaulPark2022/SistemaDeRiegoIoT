@@ -1,9 +1,11 @@
 from tkinter import BOTH, Tk, Frame, messagebox, Label
 from tkinter.ttk import Combobox, Button, Style, LabelFrame
+import threading
+import time
 
-from utils import find_available_serial_ports
-from serial_sensor import BAUDRATES
-from serial_sensor import SerialSensor
+from utils_riego import find_available_serial_ports
+from serial_sensor_riego import BAUDRATES
+from serial_sensor_riego import SerialSensor
 
 class App(Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -25,7 +27,7 @@ class App(Frame):
         self.init_gui()
 
     def init_gui(self) -> None:
-        self.parent.title('ArduSerial')
+        self.parent.title('SistemaRiego')
         self.parent.geometry('600x400')
         self['bg'] = 'lightgrey'
         self.pack(expand=True, fill=BOTH)
@@ -40,8 +42,12 @@ class App(Frame):
     def refresh_serial_devices(self) -> None:
         ports = find_available_serial_ports()
         self.serial_devices_combobox['values'] = ports
-
+        
     def connect_serial_device(self) -> None:
+        # Ejecutar la conexión en un hilo separado
+        threading.Thread(target=self._connect_serial_device).start()
+
+    def _connect_serial_device(self) -> None:
         try:
             baudrate = int(self.baudrate_combobox.get())
             port = self.serial_devices_combobox.get()
@@ -49,9 +55,13 @@ class App(Frame):
                 messagebox.showerror('Port not selected', 'Please select a valid port.')
                 return
             self.serial_device = SerialSensor(port=port, baudrate=baudrate)
+            time.sleep(2)  # Simulación del tiempo de conexión (eliminar si no es necesario)
+            messagebox.showinfo('Connection', 'Serial device connected successfully.')
         except ValueError:
             messagebox.showerror('Wrong baudrate', 'This baudrate is not valid.')
             return
+        except Exception as e:
+            messagebox.showerror('Connection error', f"An error occurred: {e}")
 
     def read_humidity(self) -> None:
         if self.serial_device is not None:
